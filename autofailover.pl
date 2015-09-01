@@ -118,11 +118,14 @@ process_frame(NewNodes, DownNodes) :-
     (nodes_changed(NewNodes) -> reset_down_nodes(); true).
 
 main(_Args) :-
-    process_frame([1,2,3],[1]),
-    process_frame([1,2,3],[1]),
-    process_frame([1,2,3],[1]),
-    process_frame([1,2,3],[1]),
-    process_frame([1,2,3],[1]),
-    process_frame([1,2,3],[1]),
+    prompt1(""),
+    read_term([Nodes, Down], []),
+
+    process_frame(Nodes, Down),
+    process_frame(Nodes, Down),
+    process_frame(Nodes, Down),
+    process_frame(Nodes, Down),
+    process_frame(Nodes, Down),
+    process_frame(Nodes, Down),
     call(actions(R)),
     format("~p~n", [R]).
