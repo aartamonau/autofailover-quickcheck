@@ -1,3 +1,6 @@
+#!/usr/bin/swipl -q -s
+
+:- initialization main.
 :- dynamic mailed_too_small/1, mailed_down/1, node/2.
 
 init_state() :-
@@ -113,3 +116,13 @@ process_frame(NewNodes, DownNodes) :-
     forall(member(Id, CombinedNodes), process_node(Id, NewNodes, DownNodes)),
 
     (nodes_changed(NewNodes) -> reset_down_nodes(); true).
+
+main(_Args) :-
+    process_frame([1,2,3],[1]),
+    process_frame([1,2,3],[1]),
+    process_frame([1,2,3],[1]),
+    process_frame([1,2,3],[1]),
+    process_frame([1,2,3],[1]),
+    process_frame([1,2,3],[1]),
+    call(actions(R)),
+    format("~p~n", [R]).
