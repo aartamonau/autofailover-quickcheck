@@ -118,14 +118,36 @@ process_frame(NewNodes, DownNodes) :-
     (nodes_changed(NewNodes) -> reset_down_nodes(); true).
 
 main(_Args) :-
-    prompt1(""),
-    read_term([Nodes, Down], []),
+    prompt(_, ''),
+    loop().
 
+loop() :-
+    read(Term),
+    process_line(Term),
+    loop().
+
+process_line(end_of_file) :-
+    halt().
+process_line(frame(Nodes, Down)) :-
     process_frame(Nodes, Down),
-    process_frame(Nodes, Down),
-    process_frame(Nodes, Down),
-    process_frame(Nodes, Down),
-    process_frame(Nodes, Down),
-    process_frame(Nodes, Down),
-    call(actions(R)),
-    format("~p~n", [R]).
+    actions(Actions),
+    include(action_of_type(failover), Actions, Failover),
+    include(action_of_type(mail_too_small), Actions, MailTooSmall),
+    include(action_of_type(mail_down_warning), Actions, MailDown),
+
+    maplist(action_node, Failover, FailoverNodes),
+    maplist(action_node, MailTooSmall, MailTooSmallNodes),
+    maplist(action_node, MailDown, MailDownNodes),
+
+    format("(~w,~w,~w)~n", [FailoverNodes, MailTooSmallNodes, MailDownNodes]).
+process_line(Other) :-
+    format("bad input term ~p~n", [Other]),
+    halt(1).
+
+action_node(action_failover(Id), Id).
+action_node(action_mail_too_small(Id), Id).
+action_node(action_mail_down_warning(Id), Id).
+
+action_of_type(failover, action_failover(_)).
+action_of_type(mail_too_small, action_mail_too_small(_)).
+action_of_type(mail_down_warning, action_mail_down_warning(_)).
