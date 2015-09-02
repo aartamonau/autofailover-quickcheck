@@ -24,6 +24,8 @@ import qualified Data.Sequence as Seq
 import GHC.Generics (Generic)
 import Text.PrettyPrint.Generic (Pretty, prettyShow)
 
+import Text.Printf (printf)
+import System.Process (readProcess)
 import Test.QuickCheck (Arbitrary(arbitrary, shrink), Gen, Property,
                         forAll, resize, sized, choose, elements)
 
@@ -379,6 +381,24 @@ run hist = evalAF (mapM process hist) defaultState
 
 runHistory :: History -> [(Time, [Action])]
 runHistory = run . expandHistory
+
+runModel :: History -> IO [(Time, [Action])]
+runModel hist = do
+  output <- readProcess "./autofailover.pl" [] input
+  return $ zip ts $ map decodeLine (lines output)
+
+  where (ts, worlds) = unzip $ expandHistory hist
+
+        input = unlines $ map encodeFrame worlds
+        encodeFrame (nodes, downNodes) =
+          printf "frame(%s,%s)." (show nodes) (show downNodes)
+
+        decodeLine line =
+          map (DoFailover,) failover ++
+          map (DoMailTooSmall,) mailTooSmall ++
+          map (DoMailDownWarning,) mailDown
+
+          where (failover, mailTooSmall, mailDown) = read line
 
 checkProperty :: Int
               -> ([Action] -> Maybe [World] -> Bool)
