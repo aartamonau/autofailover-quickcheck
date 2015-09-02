@@ -75,8 +75,7 @@ live_node(Id, AllNodes, DownNodes) :-
     member(Id, AllNodes),
     \+member(Id, DownNodes).
 
-nodes_changed(NewNodes) :-
-    all_nodes(OldNodes),
+nodes_changed(NewNodes, OldNodes) :-
     subtract(NewNodes, OldNodes, Diff1),
     subtract(OldNodes, NewNodes, Diff2),
     ([_|_] = Diff1 ; [_|_] = Diff2).
@@ -115,7 +114,7 @@ process_frame(NewNodes, DownNodes) :-
     union(OldNodes, NewNodes, CombinedNodes),
     forall(member(Id, CombinedNodes), process_node(Id, NewNodes, DownNodes)),
 
-    (nodes_changed(NewNodes) -> reset_down_nodes(); true).
+    (nodes_changed(NewNodes, OldNodes) -> reset_down_nodes(); true).
 
 main(_Args) :-
     prompt(_, ''),
