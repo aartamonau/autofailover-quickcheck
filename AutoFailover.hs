@@ -16,11 +16,8 @@ import Control.Monad.State (State, StateT,
                             evalState, evalStateT,
                             runState, execState, gets, modify)
 import Control.Monad.Trans (lift)
-import Data.Foldable (toList)
 import Data.List ((\\), sort, delete, nub)
-import Data.Maybe (catMaybes, fromJust)
-import Data.Sequence (Seq, (<|))
-import qualified Data.Sequence as Seq
+import Data.Maybe (catMaybes)
 import GHC.Generics (Generic)
 import Text.PrettyPrint.Generic (Pretty, prettyShow)
 
@@ -30,8 +27,6 @@ import Test.QuickCheck (Arbitrary(arbitrary, shrink),
                         Gen, Property, (===),
                         forAll, resize, sized, choose, elements,
                         ioProperty)
-
-import Debug.Trace
 
 type NodeId = Int
 data DownState = New | HalfDown | NearlyDown | Failover | Up
