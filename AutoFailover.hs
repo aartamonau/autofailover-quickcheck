@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE TupleSections #-}
 
-module AutoFailover where
+module AutoFailover (main) where
 
 import Control.Monad (forM, replicateM)
 import Control.Monad.State (State, StateT,
@@ -26,7 +26,7 @@ import System.Process (readProcess)
 import Test.QuickCheck (Arbitrary(arbitrary, shrink),
                         Gen, Property, (===),
                         forAll, resize, sized, choose, elements,
-                        ioProperty)
+                        ioProperty, quickCheckWith, stdArgs, maxSuccess)
 
 type NodeId = Int
 data DownState = New | HalfDown | NearlyDown | Failover | Up
@@ -408,3 +408,6 @@ prop_checkByModel = forAll smallClusters doCheck
           modelResult <- runModel hist
 
           return $ result === modelResult
+
+main :: IO ()
+main = quickCheckWith (stdArgs {maxSuccess = 1000}) prop_checkByModel
