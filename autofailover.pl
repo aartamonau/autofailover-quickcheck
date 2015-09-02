@@ -98,9 +98,11 @@ new_state(Id, _, DownNodes, NewState) :-
 process_node(Id, AllNodes, DownNodes) :-
     new_state(Id, AllNodes, DownNodes, NewState),
     retractall(node(Id, _)),
-    asserta(node(Id, NewState)).
+    asserta(node(Id, NewState)),
+    (is_up(Id) -> retractall(mailed_down(Id)); true).
 process_node(Id, AllNodes, DownNodes) :-
     \+new_state(Id, AllNodes, DownNodes, _),
+    retractall(mailed_down(Id)),
     retractall(node(Id, _)).
 
 reset_down_nodes() :-
