@@ -26,8 +26,10 @@ import Text.PrettyPrint.Generic (Pretty, prettyShow)
 
 import Text.Printf (printf)
 import System.Process (readProcess)
-import Test.QuickCheck (Arbitrary(arbitrary, shrink), Gen, Property,
-                        forAll, resize, sized, choose, elements)
+import Test.QuickCheck (Arbitrary(arbitrary, shrink),
+                        Gen, Property, (===),
+                        forAll, resize, sized, choose, elements,
+                        ioProperty)
 
 import Debug.Trace
 
@@ -396,129 +398,18 @@ runModel hist = do
         encodeFrame (nodes, downNodes) =
           printf "frame(%s,%s)." (show nodes) (show downNodes)
 
-        decodeLine line =
+        decodeLine line = sort $
           map (DoFailover,) failover ++
           map (DoMailTooSmall,) mailTooSmall ++
           map (DoMailDownWarning,) mailDown
 
           where (failover, mailTooSmall, mailDown) = read line
 
-checkProperty :: Int
-              -> ([Action] -> Maybe [World] -> Bool)
-              -> History
-              -> Bool
-checkProperty lookBehind prop = checkPropertyAcc lookBehind prop' ()
-  where prop' actions past _ = (prop actions past, ())
+prop_checkByModel :: Property
+prop_checkByModel = forAll smallClusters doCheck
 
-checkPropertyAcc :: Int
-                 -> ([Action] -> Maybe [World] -> acc -> (Bool, acc))
-                 -> acc
-                 -> History
-                 -> Bool
-checkPropertyAcc lookBehind prop z history =
-  loop (zip worlds' actions') Seq.empty z
-  where worlds  = expandHistory history
-        actions = run worlds
+  where doCheck hist = ioProperty $ do
+          let result = runHistory hist
+          modelResult <- runModel hist
 
-        worlds'  = map snd worlds
-        actions' = map snd actions
-
-        push world seq
-          | Seq.length seq < lookBehind = world <| seq
-          | otherwise                   = world <| Seq.take (lookBehind - 1) seq
-
-        loop [] _ _ = True
-        loop ((w, a) : rest) pastWorlds acc = holds && loop rest pastWorlds' acc'
-          where pastWorlds'   = push w pastWorlds
-                maybeWorlds
-                  | Seq.length pastWorlds' == lookBehind =
-                      Just (toList pastWorlds')
-                  | otherwise =
-                      Nothing
-                (holds, acc') = prop a maybeWorlds acc
-
-checkSimplePropertyAcc :: ([Action] -> World -> acc -> (Bool, acc))
-                       -> acc
-                       -> History
-                       -> Bool
-checkSimplePropertyAcc prop = checkPropertyAcc 1 prop'
-  where prop' a ws = prop a (head $ fromJust ws)
-
-checkSimpleProperty :: ([Action] -> World -> Bool) -> History -> Bool
-checkSimpleProperty prop = checkSimplePropertyAcc prop' ()
-  where prop' actions past _ = (prop actions past, ())
-
-actionIs :: Action -> ActionType -> Bool
-actionIs action atype = actionType action == atype
-
--- actual properties
-
--- check that we mail "too small" warning when the cluster size is less or
--- equal minClusterSize
-prop_mailTooSmallClusterSize :: Property
-prop_mailTooSmallClusterSize =
-  forAll smallClusters (checkSimpleProperty prop)
-
-  where prop actions (nodes, _)
-          | hasTooSmall = length nodes <= minClusterSize
-          | otherwise   = True
-          where hasTooSmall = any (`actionIs` DoMailTooSmall) actions
-
--- check that we never send mail too small warning for more than one node
-prop_mailTooSmallJustOne :: Property
-prop_mailTooSmallJustOne =
-  forAll smallClusters (checkSimpleProperty prop)
-
-  where prop actions (nodes, _) = num == 0 || num == 1
-          where warnings = filter (`actionIs` DoMailTooSmall) actions
-                num      = length warnings
-
--- check that we mail the warning only if the node has been down for
--- failoverThreshold number of ticks
-prop_mailTooSmallDown :: Property
-prop_mailTooSmallDown =
-  forAll smallClusters (checkProperty failoverThreshold prop)
-
-  where prop actions maybeWorlds
-          | Nothing <- maybeWorlds =
-              null nodes
-          | Just worlds <- maybeWorlds =
-              and [isDown n w | n <- nodes, w <- worlds]
-          where nodes = map actionNode $ filter (`actionIs` DoMailTooSmall) actions
-                isDown n (_, failed) = n `elem` failed
-
--- check that we don't warn again unless the node configuration has changed
-prop_mailTooSmallNoDups :: Property
-prop_mailTooSmallNoDups =
-  forAll smallClusters (checkSimplePropertyAcc prop [])
-
-  where prop actions (nodes, _) seen
-          | hasTooSmall = (nodes `notElem` seen, nodes : seen)
-          | otherwise   = (True, seen)
-          where hasTooSmall = any (`actionIs` DoMailTooSmall) actions
-
--- mail the warning if the node has been down for a failoverThreshold number
--- of frames and the node configuration haven't been seen before
-prop_mailTooSmallWhenDown :: Property
-prop_mailTooSmallWhenDown =
-  forAll smallClusters (checkPropertyAcc failoverThreshold prop [])
-
-  where prop actions maybePast seen
-          | Nothing <- maybePast = (null mailNodes, seen)
-          | Just past <- maybePast =
-              let (nodes, _)   = head past
-                  downNodes    = [n | n <- nodes, all (isDown n) past]
-                  gracePeriod  = and [length f == 1 |
-                                      (_, f) <- take downGracePeriod past]
-                  nodesChanged = any ((/= nodes) . fst) past
-                  seen'        = nodes : seen
-              in if | not gracePeriod -> (null mailNodes, seen)
-                    | nodes `elem` seen -> (null mailNodes, seen)
-                    | length nodes > minClusterSize -> (null mailNodes, seen)
-                    | nodesChanged -> (null mailNodes, seen)
-                    | null mailNodes -> (null downNodes, seen)
-                    | otherwise -> (sort downNodes == sort mailNodes, seen')
-          where mailNodes =
-                  map actionNode $ filter (`actionIs` DoMailTooSmall) actions
-
-        isDown n (_, failed) = n `elem` failed
+          return $ result === modelResult
