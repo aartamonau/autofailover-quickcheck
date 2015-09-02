@@ -71,7 +71,7 @@ execAF = execState
 data ActionType = DoFailover
                 | DoMailTooSmall
                 | DoMailDownWarning
-                deriving (Eq, Generic, Pretty)
+                deriving (Eq, Ord, Generic, Pretty)
 
 type Action = (ActionType, NodeId)
 
@@ -161,7 +161,10 @@ processFrame allNodes downNodes = do
           | otherwise                     = ns { downCounter = newCounter }
 
 getActions :: AF [Action]
-getActions = do
+getActions = sort <$> doGetActions
+
+doGetActions :: AF [Action]
+doGetActions = do
   downStates <- filter isDown <$> gets nodeStates
 
   case downStates of
